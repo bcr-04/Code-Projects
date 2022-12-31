@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        
+    </head>
+    <body>
+        <script>
+            let points = [];
+            let rects = [];
+            let dampening = 0.0035;
+            let bounce = 1;
+            let gravity = [0,0.1];
+            let zout = 2;
+            let statfrict = 0;
+            let diameter = 32;
+            //dampening = -0.0035;
+            let pointcount = 0;
+            let springcount = 0;
+            let objcount = 0;
+            let center = [250,250];
+
+            document.onkeydown = function(){
+                //p33.vy-=30;
+            }
+            let myGameArea = {
+                
+                canvas : document.createElement('canvas'),
+                start : function(){
+                    this.canvas.width = 500;
+                    this.canvas.height = 500;
+                    this.context = this.canvas.getContext('2d');
+                    this.canvas.style += 'display:block;margin:auto;border:1px solid black;';
+                    document.body.insertBefore(this.canvas, document.body.childNodes[0]);
+                    this.interval = setInterval(updateGameArea, 20);
+                },
+                clear : function() {
+                    this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                }
+            }
+            function spring(point1, point2, rigidity) {
+                springcount++;
+                this.point1 = point1;
+                this.point2 = point2;
+                this.rigidity = rigidity;
+                this.normaldist = ((this.point1.x - this.point2.x) ** 2 + (this.point1.y - this.point2.y) ** 2) ** 0.5;
+                this.dist = this.normaldist;
+                this.update = function(){
+                    let x1 = this.point1.x,
+                        y1 = this.point1.y,
+                        x2 = this.point2.x,
+                        y2 = this.point2.y;
+                    this.dist = ((x1 - x2) ** 2 + (y1 - y2) ** 2) ** 0.5;
+                    //console.log(this.point1);
+                    let angle = Math.atan2(y1 - y2, x1 - x2);
+                    //console.log([x1,y1,x2,y2]);
+                    //console.log(angle);
+                    return [this.rigidity/2*(Math.abs(this.dist - this.normaldist)**(1)) * Math.cos(angle),this.rigidity/2*(Math.abs(this.dist - this.normaldist)**(1)) * Math.sin(angle), Math.sign(this.dist - this.normaldist)];
+                }
+            }
+            function point(x,y, springarr,rigidity, color){
+                pointcount++;
+                this.color = color;
+                this.rigidity = rigidity;
+                this.x = x;
+                this.y = y;
+                this.springarr = springarr;
+                this.springs = [];
+                this.vx = 0;
+                this.vy = 0;
+                this.pvx = this.vx;
+                this.pvy = this.vy;
+                for(let i in springarr){
+                    this.springs.push(new spring(this,springarr[i],this.rigidity));
+                    springarr[i].springs.push(new spring(springarr[i],this,this.rigidity));
+                }
+                
+                points.push(this);
+                this.move = function(){
+                    for(let i in this.springs){
+                        let vec = this.springs[i].update();
+                        this.vx -= vec[0] / this.springs.length * vec[2];
+                        this.vy -= vec[1] / this.springs.length * vec[2];
+                    }
+                    
+                    this.avgvel = this.avg();
+                    this.pvx = (this.vx-this.avgvel[0])*(1-dampening) + this.avgvel[0];
+                    this.pvy = (this.vy-this.avgvel[1])*(1-dampening) + this.avgvel[1];
+                    let diffvx = (this.vx - this.pvx) / (this.springs.length + 1);
+                    let diffvy = (this.vy - this.pvy) / (this.springs.length + 1);
+                    for (let i in this.springs){
+                        this.springs[i].ppvx += diffvx;
+                        this.springs[i].ppvy += diffvy;
+                    }
+                    
+                    this.ppvx += diffvx;
+                    this.ppvy += diffvy;
+                }
+                
+                this.update = function(){
+                    this.x+=this.vx / 2;
+                    this.y+=this.vy / 2;
+                    if(this.y>= (250 + center[1]) * zout){
+                        this.y = (250 + center[1]) * zout - 0.0;
+                        this.vy *= -1*bounce;
+                        //this.vx *= 0.97;
+                        if(Math.abs(this.vx <= statfrict)){
+                            this.vx = 0;
+                        }
+                    }
+                    
+                    if(this.y<= (-250 + center[1]) * zout){
+                        this.y = (-250 + center[1]) * zout + 0.0;
+                        this.vy *= -1*bounce;
+                        //this.vx *= 0.97;
+                        if(Math.abs(this.vx <= statfrict)){
+                            this.vx = 0;
+                        }
+                    }
+                    
+                    if(this.x>= (250 + center[0]) * zout){
+                        this.x = (250 + center[0]) * zout - 0.0;
+                        this.vx *= -1*bounce;
+                        //this.vy *= 0.97;
+                        if(Math.abs(this.vy <= statfrict)){
+                            this.vy = 0;
+                        }
+                    }
+                    
+                    if(this.x<= (-250 + center[0]) * zout){
+                        this.x = (-250 + center[0]) * zout + 0.0;
+                        this.vx *= -1*bounce;
+                        //this.vy *= 0.97;
+                        if(Math.abs(this.vy <= statfrict)){
+                            this.vy = 0;
+                        }
+                    }
+                    
+                    let ctx = myGameArea.context;
+                    for(let i in this.springs){
+                        ctx.strokeStyle = "black";
+                        ctx.lineWidth = 2 / zout;
+                        ctx.beginPath();
+                        ctx.moveTo(this.x / zout + 250 - center[0],this.y / zout + 250 - center[1]);
+                        ctx.lineTo(this.springs[i].point2.x / zout + 250 - center[0],this.springs[i].point2.y / zout + 250 - center[1]);
+                        ctx.stroke();
+                    }
+                }
+                
+                this.draw = function(){
+                    let ctx = myGameArea.context;
+                        ctx.fillStyle = this.color;
+                        ctx.fillRect((this.x - 10) /  zout + 250 - center[0], (this.y - 10) / zout + 250 - center[1], 20 / zout, 20 / zout);
+                }
+                
+                this.avg = function(){
+                    let avgval = [0,0];
+                    for(let i in this.springs){
+                        let sobj = this.springs[i].point2;
+                        let svx = sobj.vx;
+                        let svy = sobj.vy;
+                        avgval[0] += svx;
+                        avgval[1] += svy;
+                    }
+                    
+                    if(this.springs.length>0){
+                        avgval[0] /= this.springs.length;
+                        avgval[1] /= this.springs.length;
+                    }
+                    
+                    return avgval;
+                }
+            }
+            
+            function Rect(x,y,w,h,rigidity,color){
+                this.color = color;
+                this.rigidity = rigidity;
+                objcount++;
+                this.x = x;
+                this.y = y;
+                this.width = Math.round(w);
+                this.height = Math.round(h);
+                this.pointarr = [];
+                rects.push(this);
+                for(let i = 0; i < this.height; i++){
+                    this.pointarr.push([]);
+                    for(let j = 0; j < this.width; j++){
+                        let springarrproto = [];
+                        if(i != 0){
+                            springarrproto.push(this.pointarr[i-1][j]);
+                            if(i != 1){
+                                springarrproto.push(this.pointarr[i-2][j]);
+                            }
+                        }
+                        if(j != 0){
+                            springarrproto.push(this.pointarr[i][j-1]);
+                            if(j != 1){
+                                springarrproto.push(this.pointarr[i][j-2]);
+                            }
+                        }
+                        if(i != 0 && j != 0){
+                            springarrproto.push(this.pointarr[i-1][j-1]);
+                        }
+                        if(i != 0 && j + 1 < this.width){
+                            springarrproto.push(this.pointarr[i-1][j+1]);
+                        }
+                        this.pointarr[i].push(new point(this.x + j * 50, this.y + i * 50, springarrproto,this.rigidity, this.color));
+                    }
+                }
+                this.accel = function(xv,yv){
+                    for (let i in this.pointarr){
+                        for(let j in this.pointarr[i]){
+                            this.pointarr[i][j].vx+=xv;
+                            this.pointarr[i][j].vy+=yv;
+                        }
+                    }
+                }
+                this.avg = function(){
+                    let pnum = 0;
+                    let totalx = 0;
+                    let totaly = 0;
+                    let totalvx = 0;
+                    let totalvy = 0;
+                    for (let i in this.pointarr){
+                        for (let j in this.pointarr[i]){
+                            totalx += this.pointarr[i][j].x;
+                            totaly += this.pointarr[i][j].y;
+                            totalvx += this.pointarr[i][j].vx;
+                            totalvy += this.pointarr[i][j].vy;
+                            pnum++;
+                        }
+                    }
+                    this.avgx = totalx/pnum;
+                    this.avgy = totaly/pnum;
+                    this.avgvx = totalvx/pnum;
+                    this.avgvy = totalvy/pnum;
+                }
+            }
+            
+            
+            function startGame(){
+                myGameArea.start();
+                
+            }
+            function updateGameArea(){
+                myGameArea.clear();
+                for ( let i in points ) {
+                    points[i].vx += gravity[0];
+                    points[i].vy += gravity[1];
+                    points[i].ppvx = 0;
+                    points[i].ppvy = 0;
+                }
+                
+                for ( let i in points ) {
+                    points[i].move();
+                }
+                
+                for ( let i in points ) {
+                    points[i].pvx += points[i].ppvx;
+                    points[i].pvy += points[i].ppvy;
+                    points[i].vx = points[i].pvx;
+                    points[i].vy = points[i].pvy;
+                }
+                
+                for ( let i in points ) {
+                    let p1x = points[i].x + points[i].vx,
+                        p1y = points[i].y + points[i].vy;
+                    for( let j = i; j < points.length; j++){
+                        if( j > i ){
+                            let p2x = points[j].x + points[j].vx,
+                                p2y = points[j].y + points[j].vy;
+                            let pdist = ((p2x-p1x) ** 2   +   (p2y-p1y) ** 2)     **     (1/2);
+                            if(pdist <= diameter){
+                                if(points[i].pvx == points[i].vx && points[i].pvy == points[i].vy){
+                                    points[i].pvx *= 0;
+                                    points[i].pvy *= 0;
+                                }
+                                
+                                if(points[j].pvx == points[j].vx && points[j].pvy == points[j].vy){
+                                    points[j].pvx *= 0;
+                                    points[j].pvy *= 0;
+                                }
+                            }
+                        }
+                    }
+                    points[i].vx = points[i].pvx;
+                    points[i].vy = points[i].pvy;
+                }
+                
+                for ( let i in points ){
+                    points[i].update();
+                }
+                
+                for ( let i in points ){
+                    points[i].draw();
+                }
+                
+                for ( let i in rects ){
+                    rects[i].avg();
+                }
+            }
+            
+            startGame();
+            
+            let objr1 = new Rect ( 50, 50,5,5,6,"red");
+            objr1.accel(20,0);
+            
+            let objr2 = new Rect (300, 50,5,5,6,"green");
+            objr2.accel(-20,0);
+            let objr3 = new Rect (550, 50,5,5,6,"blue");
+            objr3.accel(20,0);
+            let objr4 = new Rect ( 50,300,5,5,6,"yellow");
+            objr4.accel(-20,0);
+            let objr5 = new Rect ( 50,550,5,5,6,"purple");
+            objr5.accel(20,0);
+            
+            //let snek = new Rect (50,50,3,175,7,"green");
+            console.log("Point count: " + pointcount);
+            console.log("Spring count: " + springcount);
+            console.log("Object count: " + objcount);
+        </script>
+    </body>
+</html>

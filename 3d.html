@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <style>
+            canvas {
+                position: fixed;
+                left: 0;
+                top: 0;
+                
+                
+                background-color:black;
+                background-repeat: no-repeat;
+                background-size: 100% 100%;
+                
+                
+                /*
+                background: black;
+                */
+
+            }
+
+            div {
+                margin:auto; 
+                width:400px;
+            }
+
+            .center-h{
+                margin-left:120px;
+            }
+        </style>
+        <title>3D Rendering | Fun With 3D</title>
+
+        <script>
+        
+        //I'm scared I'm gonna have to explain all of this in comments
+        /*
+        FUTURE SCRIPTING GOALS: 
+        
+            1:  FIX THE TRIANGLE SIZES TO ALLOW SMALLER TRIANGLES TO BE PRIORITIZED
+            
+            2;  ACOMMODATE FOR INTERSECTIONS
+            
+            
+        */
+            console.clear();
+            var objs = [];
+    
+            var numm = 0;
+            var key;    
+            
+            var camP = [-10,10,40];
+            const fov = innerWidth/2;
+            const uwua = ["+= 0.2","-= 0.2"];
+            //https://www.sacred-geometry.es/?q=en/content/phi-sacred-solids        for 3d shapes
+            //https://www.youtube.com/watch?v=lCSNhq1oAFo               helped me create the 3d script
+            //https://jsbin.com/mupisetifo/1/edit?html,output         original code
+
+            //https://www.benjoffe.com/code/tools/functions3d/examples more functions to use, the sign thing doesn't work
+
+            
+                
+            function Obj(xc,yc,zc,xo,yo,zo,verts,faces,objRO,show, fillc, trans){
+                this.xc = xc;
+                this.yc = yc;
+                this.zc = zc;
+                this.xo = xo;
+                this.yo = yo;
+                this.zo = zo;
+                this.show = show;
+                this.verts = verts;
+                this.faces = faces;
+                this.objRO = objRO;
+                this.objR = [0,0];
+                this.objRF;
+                this.show = show;
+                this.fillc = fillc;
+                this.trans = trans; //pog
+                for(var a = 0;a<verts.length;a++) {
+                    verts[a][0] -=this.xc;
+                    verts[a][1] -=this.yc;
+                    verts[a][2] -=this.zc;
+                }
+                objs.push(this);
+                this.render = function () { 
+                    this.objRF =  [this.objR[0] + this.objRO[0],this.objR[1] + this.objRO[1]];
+                    if(this.show){
+                        depthf = [];
+                        for(var ia = 0;ia<this.faces.length;ia++){
+                            depthf.push(this.getDepth(ia));
+                        }
+                        depthf.sort(function(af, bf){return af-bf});
+                        for(var iaa = 0;iaa<this.faces.length;iaa++){
+                            for(var i=0;i<this.faces.length;i++){
+                                if(this.getDepth(i) == depthf[depthf.length - 1 - iaa]){
+                                    ctx.strokeStyle="white";
+                                    ctx.fillStyle=this.fillc;
+                                    ctx.globalAlpha=this.trans;
+                                    const p0 = this.convert3D(verts[faces[i][0]]);
+                                    const p1 = this.convert3D(verts[faces[i][1]]);
+                                    const p2 = this.convert3D(verts[faces[i][2]]);
+                                    ctx.beginPath();
+                                    ctx.moveTo(p0[0],p0[1]);
+                                    ctx.lineTo(p1[0],p1[1]);
+                                    ctx.lineTo(p2[0],p2[1]);
+                                    ctx.lineTo(p0[0],p0[1]);
+                                    ctx.fill();
+                                    //ctx.stroke();
+                                    ctx.closePath();
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                this.rotate2D = function(x,z, rad) {
+                    const c = Math.cos(rad);
+                    const s = Math.sin(rad);
+                    return [x*c-z*s,x*s+z*c];
+                }
+                
+                this.convert3D = function(v) {
+                    
+                    const rv0 = this.rotate2D(v[0],v[2],this.objRF[1]);
+                    const rv1 = this.rotate2D(v[1],rv0[1],this.objRF[0]);
+                    
+                    return this.project(add([rv0[0] + this.xc + this.xo, rv1[0] + this.yc + this.yo,rv1[1] + this.zc + this.zo],camP));
+                }
+                
+                this.getDepth = function(f) {
+                    const facearr = this.faces[f];
+                    this.objRF =  [this.objR[0] + this.objRO[0],this.objR[1] + this.objRO[1]];
+                    
+                    return 0 - (
+                        this.rotate2D(this.verts[facearr[0]][1],
+                            this.rotate2D(this.verts[facearr[0]][0],this.verts[facearr[0]][2],this.objRF[1])[1],
+                        this.objRF[0])[1] - 
+                        this.rotate2D(this.verts[facearr[1]][1],
+                            this.rotate2D(this.verts[facearr[1]][0],this.verts[facearr[1]][2],this.objRF[1])[1],
+                        this.objRF[0])[1] - 
+                        this.rotate2D(this.verts[facearr[2]][1],
+                            this.rotate2D(this.verts[facearr[2]][0],this.verts[facearr[2]][2],this.objRF[1])[1],
+                        this.objRF[0])[1]
+                    ) / 3;
+                }
+                
+                this.getDepth2 = function(f) {
+                    const facearr = this.faces[f];
+                    /*
+                    const d0 = this.verts[facearr[0]][2];
+                    const d1 = this.verts[facearr[1]][2];
+                    const d2 = this.verts[facearr[2]][2];
+                    
+                    return 0 + (d0 + d1 + d2) / 3;
+                    */
+                    return 0 + (this.verts[facearr[0]][2] + this.verts[facearr[1]][2] + this.verts[facearr[2]][2]) / 3;
+                }
+                
+                this.project = function(v) {
+                    return [innerWidth/2+persp(v[0],v[2]),innerHeight/2+persp(v[1],v[2])];
+                }
+                
+                this.getay = function(){
+                    if(this.xc == 0 && this.yc == 0 && this.zc == 0){
+                        return this.getay2();
+                    }
+                    var aytemp = 0;
+                    for(var e=0;e<this.faces.length;e++){
+                        aytemp += this.getDepth(e);
+                    }
+                    aytemp /= this.faces.length;
+                    aytemp *= 100000000000000000;
+                    if(aytemp > 250 || aytemp < -250){
+                        aytemp /= 100000000000000000;
+                    }
+                    
+                    return aytemp;
+                }
+                
+                this.getay2 = function(){
+                    var aytemp = 0;
+                    for(var e=0;e<this.faces.length;e++){
+                        aytemp += this.getDepth2(e);
+                    }
+                    aytemp /= this.faces.length;
+                    aytemp *= 100000000000000000;
+                    if(aytemp > 250 || aytemp < -250){
+                        aytemp /= 100000000000000000;
+                    }
+                    return aytemp;
+                    
+                }
+                
+            }
+            
+            function persp(x,z) {
+                return fov*x/z;
+            }
+            
+            function add(v0,v1){
+                return [v0[0]+v1[0],v0[1]+v1[1],v0[2]+v1[2]];
+            }
+
+            function frame(){
+                if(1 == 1){
+                    c=document.querySelector("canvas");
+                    c.width=innerWidth;
+                    c.height=innerHeight;
+                    ctx=c.getContext("2d");
+                    const t = (Date.now() /1000) % (2 * Math.PI);
+                    
+                    eee.objR[1]=t   //*(Math.sin(t) + 4);
+                    eee.objR[0]=t * 2   //*(Math.sin(t) + 4);
+                    eeee.objR[1]=t  //*(Math.sin(t) + 4);
+                    eeee.objR[0]=t * 2  //*(Math.sin(t) + 4);
+                    eeeee.objR[1]=t //*(Math.sin(t) + 4);
+                    eeeee.objR[0]=t*2   //*(Math.sin(t) + 4);
+                    eeeeee.objR[1]=t    //*(Math.sin(t) + 4);
+                    eeeeee.objR[0]=t*2  //*(Math.sin(t) + 4);
+                    eeeeeee.objR[1]=t   //*(Math.sin(t) + 4);
+                    //eeeeeee.objR[1]=Math.PI / 180 * Math.floor((Date.now()/1000 / Math.PI * 180) % (360));
+                    //eeeeeee.objR[0]=(Date.now()/-100;
+                    //aaa.objR[0]=Date.now()/1111;
+                    //aaa.objR[1]=Date.now()/700;
+                    //aaa.getay();
+                    //bbb.objR[0]=Date.now()/1000;
+                    //bbb.objR[1]=Date.now()/900;
+                    
+                    //-=-//
+                    
+                    if(key != 6 && numm > 0){
+                        const uwuf = new Function ("camP["+ Math.floor(key /2) + "]" + uwua[key % 2]);
+                        uwuf();
+                        numm -= 0.1;
+                        if(numm > 2){
+                            numm -= 1;
+                        }
+                    }
+
+                    var deptho = [];
+                    for(var da = 0;da<objs.length;da++){
+                        deptho.push(objs[da].getay());
+                    }
+                    
+                    deptho.sort(function(a, b){return a-b});
+                    for(var daa = 0;daa<objs.length;daa++){
+                        for(var o=0;o<objs.length;o++){
+                            if(objs[o].getay() == deptho[deptho.length - 1 - daa] && objs[o].getay() > -1 * camP[2] && camP[2] >= 0){
+                                objs[o].render();
+                            }
+                        }
+                    }
+                }
+            }
+            
+            document.onkeydown = checkKey;
+            
+            function checkKey(e) {
+            
+                e = e || window.event;
+
+                if (e.keyCode == '37') {
+                    // left arrow
+                    //camP[0]++;
+                    key = 0;
+                    numm++;
+                }
+                else if (e.keyCode == '39') {
+                    // right arrow
+                    //camP[0]--;
+                    key = 1;
+                    numm++;
+                }
+                else if (e.keyCode == '38') {
+                    // up arrow
+                    //camP[1]++;
+                    key = 2;
+                    numm++;
+                }
+                else if (e.keyCode == '40') {
+                    // down arrow
+                    //camP[1]--;
+                    key = 3;
+                    numm++;
+                }
+                else if (e.keyCode == '189') {
+
+                    // -
+                    //camP[2]++;
+                    key = 4;
+                    numm++;
+                }
+                else if (e.keyCode == '187') {
+                    if(camP[2] >= 0){
+                    // +
+                    //camP[2]--;
+                    key = 5;
+                    numm++;
+                    }
+                } else if (e.keyCode == '72') {
+                    // h
+                    alert('arrow keys for movement, +/- for zooming');
+                    key = 6;
+                } else {
+                    key = 6;
+                }
+                
+
+            }
+
+            (()=>setInterval(frame))();
+            document.onkeyup = keyup();
+            function keyup() {
+                key = 6;    
+            }
+            
+            var eee = new Obj(8,0,0,2,0,0,
+                [[-1,-1,-1],
+                [-1,-1,1],
+                [-1,1,1],
+                [-1,1,-1],
+                [1,-2,-2],
+                [1,-2,2],
+                [1,2,2],
+                [1,2,-2]],
+                
+                [[0,1,5],
+                [0,4,5],
+                [1,2,6],
+                [1,5,6],
+                [2,3,7],
+                [2,6,7],
+                [3,0,4],
+                [3,7,4],
+                [0,1,2],
+                [0,2,3],
+                [4,5,6],
+                [4,6,7]],
+                
+                [0,0],
+                true,
+                "HotPink",
+                1
+            );
+            
+            var eeee = new Obj(8,0,0,2,0,0,
+                [[-1,-1,-1],
+                [-1,-1,1],
+                [-1,1,1],
+                [-1,1,-1],
+                [1,-2,-2],
+                [1,-2,2],
+                [1,2,2],
+                [1,2,-2]],
+                
+                [[0,1,5],
+                [0,4,5],
+                [1,2,6],
+                [1,5,6],
+                [2,3,7],
+                [2,6,7],
+                [3,0,4],
+                [3,7,4],
+                [0,1,2],
+                [0,2,3],
+                [4,5,6],
+                [4,6,7]],
+                
+                [0,Math.PI/2],
+                true,
+                "#febdd3",
+                1
+            );
+            
+            var eeeee = new Obj(8,0,0,2,0,0,
+                [[-1,-1,-1],
+                [-1,-1,1],
+                [-1,1,1],
+                [-1,1,-1],
+                [1,-2,-2],
+                [1,-2,2],
+                [1,2,2],
+                [1,2,-2]],
+                
+                [[0,1,5],
+                [0,4,5],
+                [1,2,6],
+                [1,5,6],
+                [2,3,7],
+                [2,6,7],
+                [3,0,4],
+                [3,7,4],
+                [0,1,2],
+                [0,2,3],
+                [4,5,6],
+                [4,6,7]],
+                
+                [0,Math.PI],
+                true,
+                "hsl(257, 20%, 48%)",
+                1
+            );
+            
+            var eeeeee = new Obj(8,0,0,2,0,0,
+                [[-1,-1,-1],
+                [-1,-1,1],
+                [-1,1,1],
+                [-1,1,-1],
+                [1,-2,-2],
+                [1,-2,2],
+                [1,2,2],
+                [1,2,-2]],
+                
+                [[0,1,5],
+                [0,4,5],
+                [1,2,6],
+                [1,5,6],
+                [2,3,7],
+                [2,6,7],
+                [3,0,4],
+                [3,7,4],
+                [0,1,2],
+                [0,2,3],
+                [4,5,6],
+                [4,6,7]],
+                
+                [0,Math.PI*3/2],
+                true,
+                "GoldenRod",
+                0.3
+            );
+            
+            
+            var eeeeeee = new Obj(0,0,0,10,0,0,
+                [
+                    [1,11,-1],
+                    [1,11,1],
+                    [-1,11,1],
+                    [-1,11,-1],
+                    [2,9,-2],
+                    [2,9,2],
+                    [-2,9,2],
+                    [-2,9,-2],
+                
+                    [1,-11,-1],
+                    [1,-11,1],
+                    [-1,-11,1],
+                    [-1,-11,-1],
+                    [2,-9,-2],
+                    [2,-9,2],
+                    [-2,-9,2],
+                    [-2,-9,-2]
+                ],
+                
+                [
+                    [0,1,5],
+                    [0,4,5],
+                    [1,2,6],
+                    [1,5,6],
+                    [2,3,7],
+                    [2,6,7],
+                    [3,0,4],
+                    [3,7,4],
+                    [0,1,2],
+                    [0,2,3],
+                
+                    [8,9,13],
+                    [8,12,13],
+                    [9,10,14],
+                    [9,13,14],
+                    [10,11,15],
+                    [10,14,15],
+                    [11,8,12],
+                    [11,15,12],
+                    [8,9,10],
+                    [8,10,11],
+                
+                    [4,5,12],
+                    [5,6,13],
+                    [6,7,14],
+                    [7,4,15],
+                    [12,13,5],
+                    [13,14,6],
+                    [14,15,7],
+                    [15,12,4]
+                ],
+                
+                
+                [0,0],
+                true,
+                "RGB(91,219,254)",
+                //"#f52116",
+                1
+            );
+            
+            var aaa = new Obj(0,0,0,10,0,0,
+                [[-2,-2,-2],
+                [-2,-2,2],
+                [-2,2,2],
+                [-2,2,-2],
+                [2,-2,-2],
+                [2,-2,2],
+                [2,2,2],
+                [2,2,-2]],
+                
+                [[0,1,5],
+                [0,4,5],
+                [1,2,6],
+                [1,5,6],
+                [2,3,7],
+                [2,6,7],
+                [3,0,4],
+                [3,7,4],
+                [0,1,2],
+                [0,2,3],
+                [4,5,6],
+                [4,6,7]],
+                
+                [0,0],
+                false,
+                "red",
+                1
+            );
+            
+            var sqr = new Obj(0,0,0,10,0,0,
+            [
+                [0,-5,-17],
+                [0,5,-17],
+                [5,5,-17],
+                [5,-5,-17],
+                [0,-5,-18],
+                [0,5,-18],
+                [5,5,-18],
+                [5,-5,-18]
+            ],
+            [
+                [0,1,2],
+                [2,3,0],
+                [4,5,6],
+                [6,7,4],
+                
+                [0,1,4],
+                [1,4,5],
+                [1,2,5],
+                [2,5,6],
+                [2,3,6],
+                [3,6,7],
+                [3,0,7],
+                [0,7,4]
+            ],
+                [0,0],
+                false,
+                "#ffffff",
+                0.2
+            );
+            var egg = new Obj(0,0,0,0,0,0,
+            [
+                [-1,0,0],
+                [-0.7,0,-0.7],
+                
+                [0,0,-1],
+                [0.7,0,-0.7],
+                
+                [1,0,0],
+                [0.7,0,0.7],
+                
+                [0,0,1],
+                [-0.7,0,0.7],
+                
+                [0,1,0]
+            ]
+            ,
+            [
+                [0,1,8],
+                [1,2,8],
+                [2,3,8],
+                [3,4,8],
+                [4,5,8],
+                [5,6,8],
+                [6,7,8],
+                [7,0,8]
+            ]
+            ,
+            [0,0],
+            true, 
+            "white",
+            0);
+            
+            //[-left/+right,-up/+down,-front/+back]
+            
+
+</script>
+</head>
+<body>
+    <canvas></canvas>
+</body>
+</html>

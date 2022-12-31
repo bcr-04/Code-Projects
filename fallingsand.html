@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        
+    </head>
+    <body>
+        <script>
+            let dt = .02;
+            let sz = 200;
+            let n = 30;
+            let started = false;
+            
+            
+            let gp = [0,0];
+            let px = [];
+            
+            let c = {
+                pWall : false,
+                pAir : false,
+                pSand : false,
+                pVoid : false,
+                pWater : false
+            }
+            
+            
+                    //   air           void    sand         water       wood        fire         //wall
+            let cols = [[255,255,255],[0,0,0],[250,200,50],[0,150,240],[200,120,0],[255,128,18],[128,128,128]];
+            let elems = ['air','void','sand','water','wood','fire','wall'];
+            
+            
+            
+            
+            
+            
+            
+            
+            document.addEventListener("mousemove",function(e){
+                let x = e.clientX - 8;
+                let y = e.clientY - 8;
+                gp = [Math.floor(x / sz * n), Math.floor(y / sz * n)];
+            });
+            
+            document.onkeydown = checkKeyD;
+            document.onkeyup = checkKeyU;
+            
+            function checkKeyD(e) {
+                e = e || window.event;
+                if(e.keyCode == '65'){
+                    c.pAir = true; 
+                }
+                if(e.keyCode == '82'){
+                    c.pWall = true; 
+                }
+                if(e.keyCode == '83'){
+                    c.pSand = true; 
+                }
+                if(e.keyCode == '86'){
+                    c.pVoid = true; 
+                }
+                if(e.keyCode == '87'){
+                    c.pWater = true;
+                }
+            }
+            
+            function checkKeyU(e) {
+                e = e || window.event
+                if(e.keyCode == '65'){
+                    c.pAir = false; 
+                }
+                if(e.keyCode == '82'){
+                    c.pWall = false; 
+                }
+                if(e.keyCode == '83'){
+                    c.pSand = false; 
+                }
+                if(e.keyCode == '86'){
+                    c.pVoid = false; 
+                }
+                if(e.keyCode == '87'){
+                    c.pWater = false;
+                }
+            }
+            
+            document.addEventListener('click',function(){
+                if(!started)startGame();
+                started |= 1;
+            });
+            
+            
+            
+            let myGameArea = {
+                
+                canvas : document.createElement('canvas'),
+                stat : document.createElement('p'),
+                start : function(){
+                    this.canvas.width = sz;
+                    this.canvas.height = sz;
+                    this.context = this.canvas.getContext('2d');
+                    this.canvas.style += 'display:block;margin:auto;border:1px solid black;';
+                    document.body.insertBefore(this.stat, document.body.childNodes[0]);
+                    document.body.insertBefore(this.canvas, document.body.childNodes[0]);
+                    this.interval = setInterval(updateGameArea, dt * 1000);
+                },
+                clear : function() {
+                    this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                }
+            }
+            
+            function startGame(){
+                for(let i = 0; i < n; i++){
+                    
+                    px.push([]);
+                    for(let j = 0; j < n; j++){
+                        px[i].push({value : 'air',count : 0});
+                    
+                    }
+                    
+                }
+                
+                for(let i = 0; i < n; i++){
+                    px[i][0].value = 'wall';
+                    px[0][i].value = 'wall';
+                    px[i][n-1].value = 'wall';
+                    px[n-1][i].value = 'wall';
+                }
+                eval("")
+                myGameArea.start();
+            }
+            function updateGameArea(){
+                myGameArea.clear();
+                //px[1][7].value = 'sand';
+                //px[5][17].value = 'water';
+                for(let i = 1; i < n - 1; i++){
+                    //px[1][i].value = 'sand';
+                }
+                let npx = px;
+                for(let i = 0; i < n; i++){
+                    for(let j = 0; j < n; j++){
+                        px[j][i].count = 0;
+                    }
+                }
+                for(let i = 0; i < n; i++){
+                    for(let j = 0; j < n; j++){
+                        if(px[j][i].value == 'air' || px[j][i].value == 'wall' || px[j][i].count == 1)continue;
+                        if(px[j][i].value == 'sand'){
+                            let funcs = [
+                                "else if(npx[j+1][i-1].value == 'air' || npx[j+1][i-1].value == 'water'){npx[j][i].value = npx[j+1][i-1].value;npx[j+1][i-1].value = 'sand';npx[j+1][i-1].count = 1;}"
+                                ,
+                                "else if(npx[j+1][i+1].value == 'air' || npx[j+1][i+1].value == 'water'){npx[j][i].value = npx[j+1][i+1].value;npx[j+1][i+1].value = 'sand';npx[j+1][i+1].count = 1;}"
+                            ]
+                            eval("if(npx[j+1][i].value == 'air' || npx[j+1][i].value == 'water'){npx[j][i].value = npx[j+1][i].value;npx[j+1][i].value = 'sand';npx[j+1][i].count = 1;}"+combine(shuffle(funcs)));
+                        } else if(px[j][i].value == 'water'){
+                            
+                            let funcs = [
+                                //"else if(npx[j+1][i].value == 'air'){npx[j][i].value = npx[j+1][i].value;npx[j+1][i].value = 'water';npx[j+1][i].count = 1;}"
+                                //,
+                                "else if(npx[j][i-1].value == 'air'){npx[j][i].value = npx[j][i-1].value;npx[j][i-1].value = 'water';npx[j][i-1].count = 1;}"
+                                ,
+                                "else if(npx[j][i+1].value == 'air'){npx[j][i].value = npx[j][i+1].value;npx[j][i+1].value = 'water';npx[j][i+1].count = 1;}"
+                                ,
+                                "else if(npx[j+1][i-1].value == 'air'){npx[j][i].value = npx[j+1][i-1].value;npx[j+1][i-1].value = 'water';npx[j+1][i-1].count = 1;}"
+                                ,
+                                "else if(npx[j+1][i+1].value == 'air'){npx[j][i].value = npx[j+1][i+1].value;npx[j+1][i+1].value = 'water';npx[j+1][i+1].count = 1;}"
+                            ];
+                            eval("if(npx[j+1][i].value == 'air'){npx[j][i].value = npx[j+1][i].value;npx[j+1][i].value = 'water';npx[j+1][i].count = 1;}"+combine(shuffle(funcs)));
+                            
+                            
+                        } else if(px[j][i].value == 'void'){
+                            if(i>1 && npx[j][i-1].value != 'void')npx[j][i-1].value = 'air';
+                            if(i<n-2 && npx[j][i+1].value != 'void')npx[j][i+1].value = 'air';
+                            if(j>1 && npx[j-1][i].value != 'void')npx[j-1][i].value = 'air';
+                            if(j<n-2 && npx[j+1][i].value != 'void')npx[j+1][i].value = 'air';
+                            if(i>1 && j>1 && npx[j-1][i-1].value != 'void')npx[j-1][i-1].value = 'air';
+                            if(i>1 && j<n-2 && npx[j+1][i-1].value != 'void')npx[j+1][i-1].value = 'air';
+                            if(i<n-2 && j>1 && npx[j-1][i+1].value != 'void')npx[j-1][i+1].value = 'air';
+                            if(i<n-2 && j<n-2 && npx[j+1][i+1].value != 'void')npx[j+1][i+1].value = 'air';
+                            
+                        }
+                    }
+                }
+                
+                px = npx;
+                
+                if(gp[0] >= 1 && gp[1] >= 1 && gp[0] < n - 1 && gp[1] < n - 1){
+                    if(c.pAir)px[gp[1]][gp[0]].value = 'air';
+                    if(c.pWall)px[gp[1]][gp[0]].value = 'wall';
+                    if(c.pSand)px[gp[1]][gp[0]].value = 'sand';
+                    if(c.pVoid)px[gp[1]][gp[0]].value = 'void';
+                    if(c.pWater)px[gp[1]][gp[0]].value = 'water';
+                }
+                
+                let ctx = myGameArea.context;
+                for(let i = 0; i < n; i++){
+                    for(let j = 0; j < n; j++){
+                        ctx.fillStyle = toCol(cols[elems.indexOf(px[j][i].value)]);
+                        ctx.fillRect(i*sz/n,j*sz/n,sz/n,sz/n);
+                    }
+                }
+            }
+            function combine(arr){
+                let returnString = "";
+                for(let i in arr){
+                    returnString += arr[i];
+                }
+                return returnString;
+            }
+            function shuffle(arr){
+                return arr.sort(function(){return 0.5 - Math.random()});
+            }
+            
+            function toCol(col){
+                return 'rgb('+col[0]+','+col[1]+','+col[2]+')';
+            }
+            new Blob()
+            //startGame();
+            
+        </script>
+    </body>
+</html>

@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <style>
+            body {
+                background-color: 'black';
+            }
+        </style>
+    </head>
+    <body>
+        <script>
+            const cSize = (132 - 10)/5;
+            let n = (cSize - 2) * 5;
+            const dt = 0.2;
+            const iter = 4;
+            const fluid = {
+                
+                   VISCOSITY : 0.245*0.10,
+                   DIFFUSION : 0.245*0.0,
+                        PVAL : 0.245*0.10,
+                      INCOMP : 1,
+                        DMAX : 10,
+                      V_SENS : 3,
+                       DROPS : false,
+                   DROPSPROB : 0.5,
+                  DROPSDELAY : 90,
+                  MOUSECONTS : false,
+                 DISPDENSITY : true,
+                DISPVELOCITY : false,
+                     DENSREP : 'colors',
+                         HUE : 256,//Math.floor(Math.random()*360),
+                        VMAX : cSize / (n + 2) / dt,
+                       SCALE : 2*5,
+                        FLOW : true,
+                         DOT : false,
+                   RANDRESET : false,
+                   RESETPROB : 0.0001,
+                      PFORCE : false
+                
+            }
+            let countDown = 0;
+            let countDownF = 0;
+            let chosenI = 0;
+            let chosenJ = 0;
+            let chosenStats = [0,0,0,0];
+            let dAngle = 0, ddAngle = 0;
+            
+            
+            let initV = false;
+            let flows = [];
+            
+            /*
+            rscs:
+            
+            https://www.karlsims.com/fluid-flow.html
+            https://www.dgp.toronto.edu/public_user/stam/reality/Research/pdf/ns.pdf
+            
+            
+            
+            refer to pressure gradient force chart.png for the following:
+            F(x)PG/m = -(1/p)*(dP/dX)
+            dX should be cRects[i][j].size / 1000 * 2
+            dP should be (cRects[i][j-1].density[0] - cRects[i][j].density[0] - cRects[i][j+1].density[0])/2
+            so the F(x) should be (cRects[i][j-1].density[0] - cRects[i][j].density[0] - cRects[i][j+1].density[0])/4*fluid.PVAL
+            
+            
+            
+            
+            
+            
+            */
+            
+            
+            
+            
+            
+            
+            let mx = 0, my = 0, gx = -10, gy = -10;
+            
+            let pRects = [];
+            let cRects = [];
+            let nRects = [];
+            //let test = false;
+            let k = dt * fluid.DIFFUSION;
+            let l = dt * fluid.VISCOSITY;
+            let m = dt * fluid.PVAL;
+            
+            let myGameArea = {
+                
+                canvas : document.createElement('canvas'),
+                stat : document.createElement('p'),
+                start : function(){
+                    this.canvas.width = cSize * fluid.SCALE;
+                    this.canvas.height = cSize * fluid.SCALE;
+                    this.context = this.canvas.getContext('2d');
+                    this.canvas.style += 'display:block;margin:auto;border:1px solid black;';
+                    document.body.insertBefore(this.stat, document.body.childNodes[0]);
+                    document.body.insertBefore(this.canvas, document.body.childNodes[0]);
+                    if(fluid.MOUSECONTS){
+                    document.addEventListener('mousemove',function(e){
+                        let x = e.clientX - 8;
+                        let y = e.clientY - 8;
+                
+                        let mvx = x - mx;
+                        let mvy = y - my;
+                        if(gx >= 1 && gy >= 1 && gx < n + 1 && gy < n + 1){
+                            cRects[gy][gx].velocity[0] += mvx / dt;
+                            cRects[gy][gx].velocity[1] += mvy / dt;
+                            for(let g in cRects[gy][gx].density){
+                                cRects[gy][gx].density[g] += 10;
+                            }
+                        }
+                
+                    
+                        mx = x;
+                        my = y;
+                
+                        gx = Math.floor(x / cSize * (n + 2) / fluid.SCALE);
+                        gy = Math.floor(y / cSize * (n + 2) / fluid.SCALE);
+                        
+                        stb();
+                        //console.log([gy,gx]);
+                        
+                        pRects = cRects;
+                        nRects = pRects;
+                
+                
+                        
+                    });
+                    }
+                    
+                    for(let i = 0; i < n + 2; i++){
+                        pRects.push([]);
+                        cRects.push([]);
+                        nRects.push([]);
+                        for(let j = 0; j < n + 2; j++){
+                            
+                            nRects[i].push({position:[j*cSize/(n+2),i*cSize/(n+2)],center:[j*cSize/(n+2)+cSize/(n+2)/2,i*cSize/(n+2)+cSize/(n+2)/2],size:cSize/(n+2),velocity:[0,0,0],density:[0,0,0,1],floors:[0,0],fracts:[0,0],trans:[0,0],locs:[0,0],z:[0,0]})
+                            cRects[i].push({position:[j*cSize/(n+2),i*cSize/(n+2)],center:[j*cSize/(n+2)+cSize/(n+2)/2,i*cSize/(n+2)+cSize/(n+2)/2],size:cSize/(n+2),velocity:[0,0,0],density:[0,0,0,1],floors:[0,0],fracts:[0,0],trans:[0,0],locs:[0,0],z:[0,0]})
+                            pRects[i].push({position:[j*cSize/(n+2),i*cSize/(n+2)],center:[j*cSize/(n+2)+cSize/(n+2)/2,i*cSize/(n+2)+cSize/(n+2)/2],size:cSize/(n+2),velocity:[0,0,0],density:[0,0,0,1],floors:[0,0],fracts:[0,0],trans:[0,0],locs:[0,0],z:[0,0]})
+                        }
+                    }
+            for(let i in cRects){
+                for(let j in cRects[i]){
+                    let tan = (cRects[i][j].position[0] - cSize/2) / (cRects[i][j].position[1] - cSize/2)
+                    cRects[i][j].velocity[0] = 0//tan/Math.sqrt(tan*tan+1)*Math.sign(cRects[i][j].position[1] - cSize/2);
+                    cRects[i][j].velocity[1] = 0//-tan/Math.sqrt(tan*tan+1)*Math.sign(cRects[i][j].position[1] - cSize/2);
+                }
+            }
+                    
+                    this.interval = setInterval(updateGameArea, dt * 1000);
+                },
+                clear : function() {
+                    this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                }
+            }
+            
+            function startGame(){
+                myGameArea.start();
+            }
+            
+            function updateGameArea() {
+                myGameArea.clear();
+                
+                
+                
+                pRects = cRects;
+                //diffuse velocities
+                for(let h = 0; h < iter; h++){
+                    nRects = cRects;
+                    for(let i = 1; i < n + 1; i++){
+                        for(let j = 1; j < n + 1; j++){
+                            let average = 0;
+                            average = (pRects[i-1][j].velocity[0] + pRects[i+1][j].velocity[0] + pRects[i][j-1].velocity[0] + pRects[i][j+1].velocity[0])/4;// + pRects[i][j].velocity[0])/5;
+                            cRects[i][j].velocity[0] =  (nRects[i][j].velocity[0] + l * average)/(l + 1);
+                            
+                            average = (pRects[i-1][j].velocity[1] + pRects[i+1][j].velocity[1] + pRects[i][j-1].velocity[1] + pRects[i][j+1].velocity[1])/4;// + pRects[i][j].velocity[1])/5;
+                            cRects[i][j].velocity[1] = (nRects[i][j].velocity[1] + l * average)/(l + 1);
+                            
+                            bounds(i,j);
+                            
+                        }
+                    }
+                    pRects = cRects;
+                    
+                }
+                nRects = cRects;
+                
+                
+                
+                //clear divergence
+                
+                clearDiv();
+                
+                
+                
+                
+                
+                
+                
+                
+                //advect velocities
+                for(let h = 0; h < iter; h++){
+                    //nRects = cRects;
+                    pRects = cRects;
+                    for(let i = 1; i < n + 1; i++){
+                        for(let j = 1; j < n + 1; j++){
+                            
+                            pRects[i][j].locs = [(nRects[i][j].position[0] - nRects[i][j].velocity[0] * dt)/nRects[i][j].size,(nRects[i][j].position[1] - nRects[i][j].velocity[1] * dt)/nRects[i][j].size];
+                            
+                            pRects[i][j].floors = [Math.min(Math.floor(pRects[i][j].locs[0]),n), Math.min(Math.floor(pRects[i][j].locs[1]),n)];
+                            pRects[i][j].fracts =  [pRects[i][j].locs[0] % 1, pRects[i][j].locs[1] % 1];
+                        }
+                    }
+                    cRects = pRects;
+                    //console.log(pRects);
+                    for(let i = 1; i < n + 1; i++){
+                        for(let j = 1; j < n + 1; j++){
+                            //console.log(i + ", " + j);
+                            /*
+                            cRects[i][j].z = [
+                                lerp(pRects[nRects[i][j].floors[0]][pRects[i][j].floors[1]    ].velocity[0],pRects[pRects[i][j].floors[0] + 1][pRects[i][j].floors[1]    ].velocity[0],pRects[i][j].fracts[0]),
+                                lerp(pRects[nRects[i][j].floors[0]][pRects[i][j].floors[1] + 1].velocity[0],pRects[pRects[i][j].floors[0] + 1][pRects[i][j].floors[1] + 1].velocity[0],pRects[i][j].fracts[0])
+                            ];
+                            cRects[i][j].velocity[0] = lerp(cRects[i][j].z[0],cRects[i][j].z[1],cRects[i][j].fracts[1]);
+                            
+                            cRects[i][j].z = [
+                                lerp(pRects[cRects[i][j].floors[0]][cRects[i][j].floors[1]    ].velocity[1],pRects[cRects[i][j].floors[0] + 1][cRects[i][j].floors[1]    ].velocity[1],cRects[i][j].fracts[0]),
+                                lerp(pRects[cRects[i][j].floors[0]][cRects[i][j].floors[1] + 1].velocity[1],pRects[cRects[i][j].floors[0] + 1][cRects[i][j].floors[1] + 1].velocity[1],cRects[i][j].fracts[0])
+                            ];
+                            cRects[i][j].velocity[1] = lerp(cRects[i][j].z[0],cRects[i][j].z[1],cRects[i][j].fracts[1]);
+                            */
+                            cRects[i][j].z = [
+                                lerp(pRects[pRects[i][j].floors[1]    ][pRects[i][j].floors[0]].velocity[0],pRects[pRects[i][j].floors[1]    ][pRects[i][j].floors[0] + 1].velocity[0],pRects[i][j].fracts[0]),
+                                lerp(pRects[pRects[i][j].floors[1] + 1][pRects[i][j].floors[0]].velocity[0],pRects[pRects[i][j].floors[1] + 1][pRects[i][j].floors[0] + 1].velocity[0],pRects[i][j].fracts[0])
+                            ];
+                            cRects[i][j].velocity[0] = lerp(cRects[i][j].z[0],cRects[i][j].z[1],cRects[i][j].fracts[1]);
+                            
+                            cRects[i][j].z = [
+                                lerp(pRects[pRects[i][j].floors[1]    ][pRects[i][j].floors[0]].velocity[1],pRects[pRects[i][j].floors[1]    ][pRects[i][j].floors[0] + 1].velocity[1],pRects[i][j].fracts[0]),
+                                lerp(pRects[pRects[i][j].floors[1] + 1][pRects[i][j].floors[0]].velocity[1],pRects[pRects[i][j].floors[1] + 1][pRects[i][j].floors[0] + 1].velocity[1],pRects[i][j].fracts[0])
+                            ];
+                            cRects[i][j].velocity[1] = lerp(cRects[i][j].z[0],cRects[i][j].z[1],pRects[i][j].fracts[1]);
+                            //console.log("Success!");
+                            
+                            bounds(i,j);
+                      
+                
+                        }
+                    }
+                }
+                nRects = cRects;
+                
+                
+                
+                
+                //clear divergence
+                stb();
+                clearDiv();
+                
+                stb();
+                
+                //diffuse density
+                pRects = cRects;
+                for(let h = 0; h < iter; h++){
+                    nRects = cRects;
+                    for(let i = 1; i < n + 1; i++){
+                        for(let j = 1; j < n + 1; j++){
+                            for(let g in cRects[i][j].density){
+                                let average = 0;
+                                average = (pRects[i-1][j].density[g] + pRects[i+1][j].density[g] + pRects[i][j-1].density[g] + pRects[i][j+1].density[g])/4;// + pRects[i][j].velocity[0])/5;
+                                cRects[i][j].density[g] =  (nRects[i][j].density[g] + k * average)/(k + 1);
+                            }
+                            
+                        }
+                    }
+                    pRects = cRects;
+                    
+                }
+                nRects = cRects;
+                
+                //advect density
+                pRects = cRects;
+                for(let h = 0; h < iter; h++){
+                    pRects = cRects;
+                    for(let i = 1; i < n + 1; i++){
+                        for(let j = 1; j < n + 1; j++){
+                            
+                            pRects[i][j].locs = [(nRects[i][j].position[0] - nRects[i][j].velocity[0] * dt)/nRects[i][j].size,(nRects[i][j].position[1] - nRects[i][j].velocity[1] * dt)/nRects[i][j].size];
+                            
+                            pRects[i][j].floors = [Math.min(Math.floor(pRects[i][j].locs[0]),n), Math.min(Math.floor(pRects[i][j].locs[1]),n)];
+                            pRects[i][j].fracts =  [pRects[i][j].locs[0] % 1, pRects[i][j].locs[1] % 1];
+                        }
+                    }
+                    cRects = pRects;
+                    for(let i = 1; i < n + 1; i++){
+                        for(let j = 1; j < n + 1; j++){
+                            //console.log(i + ", " + j);
+                            /*
+                            cRects[i][j].z = [
+                                lerp(pRects[cRects[i][j].floors[0]][cRects[i][j].floors[1]    ].density,pRects[cRects[i][j].floors[0] + 1][cRects[i][j].floors[1]    ].density,cRects[i][j].fracts[0]),
+                                lerp(pRects[cRects[i][j].floors[0]][cRects[i][j].floors[1] + 1].density,pRects[cRects[i][j].floors[0] + 1][cRects[i][j].floors[1] + 1].density,cRects[i][j].fracts[0])
+                            ];
+                            cRects[i][j].density = lerp(cRects[i][j].z[0],cRects[i][j].z[1],cRects[i][j].fracts[1]);
+                            */
+                            for(let g in cRects[i][j].density){
+                                cRects[i][j].z = [
+                                    lerp(pRects[pRects[i][j].floors[1]    ][pRects[i][j].floors[0]].density[g],pRects[pRects[i][j].floors[1]    ][pRects[i][j].floors[0] + 1].density[g],pRects[i][j].fracts[0]),
+                                    lerp(pRects[pRects[i][j].floors[1] + 1][pRects[i][j].floors[0]].density[g],pRects[pRects[i][j].floors[1] + 1][pRects[i][j].floors[0] + 1].density[g],pRects[i][j].fracts[0])
+                                ];
+                                cRects[i][j].density[g] = lerp(cRects[i][j].z[0],cRects[i][j].z[1],pRects[i][j].fracts[1]);
+                            }
+                            //console.log("Success!");
+                            
+                
+                        }
+                    }
+                }
+                nRects = cRects;
+                
+                
+                
+                pRects = cRects;
+                //cRects = nRects;
+                draw();
+                
+                
+                if(fluid.DROPS){
+                    if(Math.random() < fluid.DROPSPROB && countDown == 0){
+                        chosenI = Math.floor(Math.random()*(n-2))+2;
+                        chosenJ = Math.floor(Math.random()*(n-2))+2;
+                        chosenStats = [0,0,Math.random() * fluid.DMAX,Math.random() * 2 * Math.PI];
+                        chosenStats = [Math.cos(chosenStats[3]) * fluid.VMAX,Math.sin(chosenStats[3]) * fluid.VMAX,chosenStats[2]];
+                        countDown = fluid.DROPSDELAY;
+                    } else if(countDown > 0){
+                        cRects[chosenI][chosenJ].velocity = chosenStats;
+                        cRects[chosenI][chosenJ].density = chosenStats[2];
+                        countDown--;
+                    }
+                        
+                }
+                
+                if(fluid.FLOW){
+                    for(let i in flows){
+                        flows[i].act();
+                    }
+                }
+                    
+                if(fluid.DOT){
+                    ddAngle=Math.min(Math.max(ddAngle+Math.random()*0.05-0.025,-0.12),0.12);
+                    ddAngle *= 0.95;
+                    dAngle += ddAngle*3;
+                    cRects[Math.floor(n/2+1)][Math.floor(n/2+1)].velocity = [Math.cos(dAngle)*fluid.VMAX*3,Math.sin(dAngle)*fluid.VMAX*3,0];
+                    for(let g in cRects[Math.floor(n/2+1)][Math.floor(n/2+1)].density){
+                        cRects[Math.floor(n/2+1)][Math.floor(n/2+1)].density[g] += fluid.DMAX / 1;
+                    }
+                    //cRects[Math.floor(n/2+1)][Math.floor(n/2+1)].velocity[1]=fluid.VMAX*Math.cos(dAngle);
+                }
+                
+                if(fluid.RANDRESET){
+                    if(Math.random()<fluid.RESETPROB){
+                        reset();
+                    }
+                }
+                
+                
+                
+                
+                if(fluid.PFORCE){
+                    for(let i = 1; i < n + 1; i++){
+                        for(let j = 1; j < n + 1; j++){
+                            cRects[i][j].velocity[0] += (cRects[i][j-1].density[3] - cRects[i][j+1].density[3])/4*m/(m+1);
+                            cRects[i][j].velocity[1] += (cRects[i-1][j].density[3] - cRects[i+1][j+1].density[3])/4*m/(m+1);
+                        }
+                    }
+                }
+            }
+            
+            
+            function draw() {
+            
+            
+                for(let i = 1; i < n + 1; i++){
+                    for(let j = 1; j < n + 1; j++){
+                        let current = cRects[i][j];
+                        ctx = myGameArea.context;
+                        let c;
+                        
+                        if(fluid.DENSREP == 'dye'){
+                            c = 'hsl('+fluid.HUE+','+Math.round(current.density[0]*150)+'%,'+(100-Math.round(current.density[0]*50))+'%)';
+                        } else if(fluid.DENSREP == 'smoke'){
+                            c = 'hsl(0,0%,'+Math.round(current.density[0] * 80 / fluid.DMAX)+'%)';
+                        } else if(fluid.DENSREP == 'colors'){
+                            c = 'rgb(' + Math.round(Math.min(cRects[i][j].density[0]*255/Math.pow(fluid.DMAX,-1),255)) + ','+ Math.round(Math.min(cRects[i][j].density[1]*255/Math.pow(fluid.DMAX,-1),255))+','+ Math.round(Math.min(cRects[i][j].density[2]*255/Math.pow(fluid.DMAX,-1),255))+')';
+                            //c = 'rgb(' + Math.round(Math.max(255-cRects[i][j].density[0]*255/fluid.DMAX,0)) + ','+ Math.round(Math.max(255-cRects[i][j].density[1]*255/fluid.DMAX,0))+','+ Math.round(Math.max(255-cRects[i][j].density[2]*255/fluid.DMAX,0))+')';
+                        }
+                        ctx.fillStyle = c;
+                        ctx.strokeStyle = 'black';
+                        if(fluid.DISPDENSITY){
+                        ctx.fillRect(current.position[0]*fluid.SCALE,current.position[1]*fluid.SCALE,current.size*fluid.SCALE,current.size*fluid.SCALE);
+                        }
+                        current.velocity[2] = Math.sqrt(current.velocity[0]*current.velocity[0]+current.velocity[1]*current.velocity[1]);
+                        c = 'hsl('+Math.round(current.velocity[2] * 360 )+',100%,50%)';
+                        ctx.strokeStyle = c;
+                        
+                        
+                        ctx.beginPath();
+                        ctx.moveTo(fluid.SCALE*current.center[0],fluid.SCALE*current.center[1]);
+                        ctx.lineTo(fluid.SCALE*(current.center[0]+current.velocity[0]/current.velocity[2]*current.size/2*Math.min(Math.abs(current.velocity[2]*current.size*fluid.V_SENS),1)),fluid.SCALE*(current.center[1]+current.velocity[1]/current.velocity[2]*current.size/2*Math.min(Math.abs(current.velocity[2]*current.size*fluid.V_SENS),1)));
+                        if(fluid.DISPVELOCITY){
+                            ctx.stroke();
+                        }
+                    }
+                }
+            
+            
+            }
+            
+            function lerp (a, b, k){
+                return a + k * (b - a);
+            }
+            
+            function dist (a, b){
+                return Math.sqrt(Math.pow(a[0]-b[0],2)+Math.pow(a[1]-b[1],2));
+            }
+            function bounds (i, j){
+                if(i == 1){
+                    cRects[i-1][j].velocity[1] = -1 * cRects[i][j].velocity[1];
+                    cRects[i-1][j].velocity[0] = 1 * cRects[i][j].velocity[0];
+                    cRects[i-1][j].density = cRects[i][j].density;
+                    if(j == 1){
+                        cRects[i-1][j-1].velocity[1] = cRects[i][j].velocity[1]/3;
+                        cRects[i-1][j-1].velocity[0] = cRects[i][j].velocity[0]/3;
+                        cRects[i-1][j-1].density = cRects[i][j].density;
+                    } else if(j == n){
+                        cRects[i-1][j+1].velocity[1] = cRects[i][j].velocity[1]/3;
+                        cRects[i-1][j+1].velocity[0] = cRects[i][j].velocity[0]/3;
+                        cRects[i-1][j+1].density = cRects[i][j].density;
+                    }
+                } else if(i == n){
+                    cRects[i+1][j].velocity[1] = -1 * cRects[i][j].velocity[1];
+                    cRects[i+1][j].velocity[0] = 1 * cRects[i][j].velocity[0];
+                    cRects[i+1][j].density = cRects[i][j].density;
+                    if(j == 1){
+                        cRects[i+1][j-1].velocity[1] = cRects[i][j].velocity[1]/3;
+                        cRects[i+1][j-1].velocity[0] = cRects[i][j].velocity[0]/3;
+                        cRects[i+1][j-1].density = cRects[i][j].density;
+                    } else if(j == n){
+                        cRects[i+1][j+1].velocity[1] = cRects[i][j].velocity[1]/3;
+                        cRects[i+1][j+1].velocity[0] = cRects[i][j].velocity[0]/3;
+                        cRects[i+1][j+1].density = cRects[i][j].density;
+                    }
+                }
+                if(j == 1){
+                    cRects[i][j-1].velocity[0] = -1 * cRects[i][j].velocity[0];
+                    cRects[i][j-1].velocity[1] = 1 * cRects[i][j].velocity[1];
+                    cRects[i][j-1].density = cRects[i][j].density;
+                } else if(j == n){
+                    cRects[i][j+1].velocity[0] = -1 * cRects[i][j].velocity[0];
+                    cRects[i][j+1].velocity[1] = 1 * cRects[i][j].velocity[1];
+                    cRects[i][j+1].density = cRects[i][j].density;
+                }
+                
+            }
+            
+            function clearDiv(){
+                //return;
+                nRects = cRects;
+                for(let h = 0; h < fluid.INCOMP; h++){
+                    pRects = cRects;
+                    let div = 0;
+                    for(let i = 1; i < n + 1; i++){
+                        for(let j = 1; j < n + 1; j++){
+                            /*
+                            div = (pRects[i+1][j].velocity[0]-pRects[i-1][j].velocity[1])/2 + (pRects[i][j+1].velocity[1]-pRects[i][j-1].velocity[1])/2
+                            cRects[i+1][j].velocity[0] -= div/2
+                            cRects[i-1][j].velocity[0] += div/2
+                            cRects[i][j+1].velocity[1] -= div/2
+                            cRects[i][j-1].velocity[1] += div/2
+                            */
+                            /*
+                            cRects[i][j].velocity = sum(pRects[i][j].velocity, sum(dot(sum(pRects[i-1,j-1].velocity, pRects[i+1,j+1]).velocity, [1,1]),
+                    mult(dot(sum(pRects[i-1,j+1].velocity, pRects[i+1,j-1].velocity)), [1,-1]),[1,-1]) +
+                    (f[x-1,y] + f[x+1,y] - f[x,y-1] - f[x,y+1]) * {2,-2} +
+                    f[x,y] * -4) * 1/8;
+                    */
+                    cRects[i][j].velocity =
+                    sum(
+                    nRects[i][j].velocity
+                    ,
+                    mult(
+                        sum(sum(sum(
+                            [dot(
+                                sum(
+                                    pRects[i-1][j-1].velocity 
+                                    ,
+                                    pRects[i+1][j+1].velocity
+                                )
+                                , 
+                                [1,1]
+                            )]
+                            ,
+                            mult(
+                                [dot(
+                                    sum(
+                                        pRects[i+1][j-1].velocity
+                                        ,
+                                        pRects[i-1][j+1].velocity
+                                    )
+                                    , 
+                                    [1,-1]
+                                )]
+                                ,
+                                [1,-1]
+                            )
+                        )
+                        ,
+                        mult(
+                            diff(
+                                sum(
+                                    pRects[i][j-1].velocity 
+                                    , 
+                                    pRects[i][j+1].velocity
+                                )
+                                ,
+                                sum(
+                                    pRects[i-1][j].velocity 
+                                    ,
+                                    pRects[i+1][j].velocity
+                                )
+                            )
+                            ,
+                            [2,-2]
+                        ))
+                        ,
+                        mult(
+                            pRects[i][j].velocity
+                            ,
+                            [-4,-4]
+                        )
+                    )
+                    
+                    ,
+                    [1/8,1/8]
+                    ))
+                            bounds(i,j);
+                        }
+                        
+                    }
+                    
+                    //console.log(div);
+                    /*
+                    for(let i = 1; i < n + 1; i++){
+                        for(let j = 1; j < n + 1; j++){
+                            //bounds(i,j);
+                        }
+                    }
+                    */
+                    stb();
+                }
+                //console.log('yooo');
+            }
+            
+            function dot(a,b){
+                return a[0] * b[0] + a[1] * b[1];
+            }
+            
+            function sum(a,b){
+                a = a.concat(a);
+                b = b.concat(b);
+                return [a[0]+b[0],a[1]+b[1]];
+                
+            }
+            
+            function diff(a,b){
+                a = a.concat(a);
+                b = b.concat(b);
+                return [a[0]-b[0],a[1]-b[1]];
+                
+            }
+            function mult(a,b){
+                a = a.concat(a);
+                b = b.concat(b);
+                return [a[0]*b[0],a[1]*b[1]];
+                
+            }
+            function init(){
+                if(!initV){
+                    startGame();
+                    initV = true;
+                } else {
+                    reset();
+                }
+            }
+            function stb(){
+                for(let i in cRects){
+                    for(let j in cRects[i]){
+                        cRects[i][j].velocity = [Math.min(Math.max(cRects[i][j].velocity[0],-1*fluid.VMAX),1*fluid.VMAX),Math.min(Math.max(cRects[i][j].velocity[1],-1*fluid.VMAX),1*fluid.VMAX),0];
+                        for(let g in cRects[i][j].density){
+                            cRects[i][j].density[g] = Math.min(Math.max(cRects[i][j].density[g],0),fluid.DMAX);
+                        }
+                    }
+                }
+            }
+            function reset(){
+                for(let i in cRects){
+                    for(let j in cRects[i]){
+                        cRects[i][j].velocity = [0,0,0];
+                        for(let g in cRects[i][j].density){
+                            cRects[i][j].density[g] = 0;
+                        }
+                        countDown = 0;
+                    }
+                }
+            }
+            
+            function Intake(info){
+                this.position = info.position;
+                this.velocity = [Math.cos(info.angle)*info.speed,Math.sin(info.angle)*info.speed,0]
+                this.concentration = info.concentration;
+                
+                
+                flows.push(this);
+                this.act = function(){
+                    cRects[this.position[1]][this.position[0]].velocity = this.velocity;
+                    for(let g in cRects[this.position[1]][this.position[0]].density){
+                        cRects[this.position[1]][this.position[0]].density[g] += this.concentration[g];
+                    }
+                }
+            }
+            document.addEventListener('click',init);
+            let f1 = new Intake({position:[25,Math.floor(n/2*0+1+4-0)],angle:Math.PI/2,speed:fluid.VMAX,concentration:[1,0,0,30]});
+            //let f2 = new Intake({position:[n-4,Math.floor(n/2+1+0)],angle:Math.PI/2,speed:fluid.VMAX,concentration:[0,0,255]});
+            //let f3 = new Intake({position:[Math.floor(n/2+1),Math.floor(n/2+1)],angle:3*Math.PI/2,speed:fluid.VMAX,concentration:[0,255,0]});
+            //startGame();
+        </script>
+    </body>
+</html>

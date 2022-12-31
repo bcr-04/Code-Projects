@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        
+    </head>
+    <body>
+        <script>
+            
+            
+            let objects = [];
+            let plats = [];
+            let started = false;
+            let c = {
+                pl : false,
+                pu : false,
+                pr : false,
+                pd : false,
+                pb : false,
+                pf : false
+            }
+            let cWidth = 200, cHeight = 200;
+            let currentColor;
+            
+            let myGameArea = {
+                
+                canvas : document.createElement('canvas'),
+                start : function(){
+                    this.canvas.width = cWidth;
+                    this.canvas.height = cHeight;
+                    this.context = this.canvas.getContext('2d');
+                    this.canvas.style += 'display:block;margin:auto;border:1px solid black;';
+                    document.body.insertBefore(this.canvas, document.body.childNodes[0]);
+                    this.interval = setInterval(updateGameArea, 20);
+                },
+                clear : function() {
+                    this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                }
+            }
+            
+            
+            function startGame(){
+                camera.vWidth = Math.tan(degToRad(camera.fov[0]/2));
+            
+                camera.vHeight = Math.tan(degToRad(camera.fov[1]/2));
+            
+                let bounds = [Math.cos(degToRad(camera.fov[0]/2)),Math.sin(camera.fov[1]/2)];
+                let iN = 0;
+                let jN = 0;
+                let iA = -0.5 * camera.fov[1];
+                for(let i = -1 * bounds[1]; i <= bounds[1]; i += bounds[1] / camera.n[1] / 2){
+                    camera.angs.push([]);
+                    let jA = -0.5 * camera.fov[0];
+                    for(let j = -1 * bounds[0]; j <= bounds[0]; j += bounds[0] / camera.n[0] / 2){
+                        let px = 1 + j;
+                        let py = 1 + i;
+                        let pz = 1;
+                        let dst = dist(px,py,pz);
+                        px /= dst;
+                        py /= dst;
+                        pz /= dst;
+                        let ay = radToDeg(Math.asin(py));
+                        
+                        let ax = radToDeg(Math.acos(px/Math.cos(degToRad(ay))));
+                        
+                        camera.angs[iN].push([ax,ay]);
+                        jN++;
+                    }
+                    iN++;
+                }
+                myGameArea.start();
+            }
+            
+            function updateGameArea(){
+                myGameArea.clear();
+                //for(let i in objects){
+                    //objects[i].update();
+                //}
+                
+                
+                //camera.angle[0]++;
+                camera.update();
+            }
+            
+            document.onkeydown = checkKeyD;
+            document.onkeyup = checkKeyU;
+            document.onclick = function(){
+                if(!started)startGame();
+                started |= 1;
+            }
+            ;
+            
+            function checkKeyD(e) {
+                e = e || window.event;
+                if(e.keyCode == '65'){
+                    c.pl = true; 
+                }
+                if(e.keyCode == '87'){
+                    c.pu = true;
+                }
+                if(e.keyCode == '68'){
+                    c.pr = true;
+                }
+                if(e.keyCode == '83'){
+                    c.pd = true;
+                }
+                if(e.keyCode == '81'){
+                    c.pb = true;
+                }
+                if(e.keyCode == '69'){
+                    c.pf = true;
+                }
+            }
+            
+            function checkKeyU(e) {
+                e = e || window.event;
+                if(e.keyCode == '65'){
+                    c.pl = false;
+                }
+                if(e.keyCode == '87'){
+                    c.pu = false;
+                }
+                if(e.keyCode == '68'){
+                    c.pr = false;
+                }
+                if(e.keyCode == '83'){
+                    c.pd = false;
+                }
+                if(e.keyCode == '81'){
+                    c.pb = false;
+                }
+                if(e.keyCode == '69'){
+                    c.pf = false;
+                }
+            }
+            
+            let camera = {
+                trace : function(){
+                    
+                },
+                move : function(){
+                    
+                },
+                update : function(){
+                    if(c.pl) this.x--;
+                    if(c.pu) this.y--;
+                    if(c.pb) this.z--;
+                    if(c.pr) this.x++;
+                    if(c.pd) this.y++;
+                    if(c.pf) this.z++;
+                    
+                    
+                    
+                    
+                    
+                    
+                    let ctx = myGameArea.context;
+                    for(let i = 0; i < camera.n[0] * 2 + 1*0; i++){
+                        for(let j = 0; j < camera.n[1] * 2 + 1*0; j++){
+                            //this.point = [Math.cos(degToRad(this.angle + 90 + this.angs[i][j]))*Math.cos(degToRad), Math.sin(degToRad(this.angle + 90 + this.angs[i]))];
+                            this.point = [
+                                Math.cos(degToRad(this.angle[0]+this.angs[j][i][0]))*Math.cos(degToRad(this.angle[1]+this.angs[j][i][1]))
+                                ,
+                                Math.sin(degToRad(this.angle[1]+this.angs[j][i][1]))
+                                ,
+                                Math.sin(degToRad(this.angle[0]+this.angs[j][i][0]))*Math.cos(degToRad(this.angle[1]+this.angs[j][i][1]))
+                                ]
+                            ctx.fillStyle = 'black';
+                            for(let k = 0; k < this.rDist + 1; k += this.sDist){
+                                let nx = this.point[0] * k + this.x;
+                                let ny = this.point[1] * k + this.y;
+                                let nz = this.point[2] * k + this.z;
+                                if(c.pl){
+                                    //console.log(ny)
+                                }
+                                if(isClipped(nx,ny,nz)){
+                                    let cc = currentColor;
+                                    //let col = [lerp(cc[0],bgc[0],k/camera.rDist),lerp(cc[1],bgc[1],k/camera.rDist),lerp(cc[2],bgc[2],k/camera.rDist)]
+                                    ctx.fillStyle = cc;
+                                    break;
+                                }
+                            }
+                            ctx.fillRect(i/(camera.n[0] * 2 + 1*0)*cWidth,j/(camera.n[1] * 2 + 1*0)*cHeight,cWidth/(camera.n[0] * 2 + 1*0),cHeight/(camera.n[1] * 2 + 1*0));
+                            
+                        }
+                    }
+                },
+            
+                ray : function() {
+                
+                },
+                
+                
+                x : -20*0.1,
+                y : -27*0,
+                z : -25*0,
+                rX : 30,
+                rY : 30,
+                n : [20,20],
+                fov : [100,80],
+                angle : [0,0],
+                rDist : 40 * 2,
+                sDist : .5 * 2,
+                angs : []
+                
+                
+            }
+            
+            
+            
+            
+            function Obj (info){
+                this.x = info.x;
+                this.y = info.y;
+                this.z = info.z;
+                this.width = info.width;
+                this.height = info.height;
+                this.depth = info.depth;
+                this.color = info.color;
+                plats.push(this);
+            }
+            
+            
+            
+            
+            function degToRad(angle){
+                return angle*Math.PI/180;
+            }
+            function radToDeg(angle){
+                return angle/Math.PI*180;
+            }
+            
+            function dist(x,y,z){
+                return Math.sqrt(x*x+y*y+z*z);
+            }
+            function lerp(a,b,c){
+                return a + c * (b - a);
+            }
+            
+            
+            function isClipped(nx,ny,nz){
+                let returnBool = false;
+                for(let i in plats){
+                    returnBool |= 
+                        (
+                            nx >= plats[i].x
+                        )
+                        &&
+                        (
+                            nx <= plats[i].x + plats[i].width
+                        )
+                        
+                        &&
+                        
+                        (
+                            ny >= plats[i].y
+                        )
+                        &&
+                        (
+                            ny <= plats[i].y + plats[i].height
+                        )
+                        
+                        &&
+                        
+                        (
+                            nz >= plats[i].z
+                        )
+                        &&
+                        (
+                            nz <= plats[i].z + plats[i].depth
+                        )
+                    currentColor = plats[i].color;
+                    if(returnBool)break;
+                }
+                return returnBool;
+            }
+            
+            /*
+            let o1 = new Obj({x : 5,y : -5, z : 5,width : 10, height : 10, depth : 10,color : 'rgb(0,255,0)'});
+            let o2 = new Obj({x : 5,y : -5, z : -15,width : 10, height : 10, depth : 10,color : 'rgb(255,255,0)'});
+            let o3 = new Obj({x : -15,y : -5, z : -15,width : 10, height : 10, depth : 10,color : 'rgb(0,0,255)'});
+            let o4 = new Obj({x : -15,y : -5, z : 5,width : 10, height : 10, depth : 10,color : 'rgb(255,0,0)'});
+            */
+            
+            
+            let o1 = new Obj({x : 1,y : -5, z : 1,width : 10, height : 10, depth : 10,color : 'rgb(0,255,0)'});
+            let o2 = new Obj({x : 1,y : -5, z : -11,width : 10, height : 10, depth : 10,color : 'rgb(255,255,0)'});
+            let o3 = new Obj({x : -11,y : -5, z : -11,width : 10, height : 10, depth : 10,color : 'rgb(0,0,255)'});
+            let o4 = new Obj({x : -11,y : -5, z : 1,width : 10, height : 10, depth : 10,color : 'rgb(255,0,0)'});
+            
+        </script>
+    </body>
+</html>

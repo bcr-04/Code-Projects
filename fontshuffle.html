@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style id = "style"> 
+
+</style>
+</head>
+<body>
+
+<!-- -- ><div class = "field">ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz</div><!-- -->
+<p class = "field">
+	The quick brown fox jumped over the lazy dog.    
+</p>
+
+</body>
+<script>
+    let txts = [];
+    let t = document.getElementsByClassName("field");
+    for(let i in t){
+        txts.push(t[i].innerHTML);
+    }
+    function shuffle(){
+        document.getElementById("style").innerHTML = "";
+        let letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+        let fonts = [
+            "\"Times New Roman\", Times, serif;\nfont-weight: 400",
+            "\"Times New Roman\", Times, serif;\nfont-weight: 400",
+            "\"Times New Roman\", Times, serif;\nfont-weight: 400",
+            "\"Times New Roman\", Times, serif;\nfont-weight: 400",
+            "\"Times New Roman\", Times, serif;\nfont-weight: 400",
+            "\"Times New Roman\", Times, serif;\nfont-weight: 400",
+            /*
+            "\"Times New Roman\", Times, serif",
+            "\"Times New Roman\", Times, serif",
+            "\"Times New Roman\", Times, serif",
+            */
+            
+             "Arial, Helvetica, sans-serif;\nfont-weight:200;\nfont-size:13px",
+             "\"Lucida Console\", \"Courier New\", monospace;\nfont-weight: 1;\nfont-size: 14px",
+             "Georgia, serif;\nfont-size: 14px",
+             "'Courier New', monospace",
+            
+             "\"Comic Sans MS\", \"Comic Sans\", cursive;\nfont-weight: 10;\nfont-size: 14px"
+            
+        ];
+    
+        letters = letters.split("");
+        //for(let i in [letters,fonts].sort((a,b) => a.length - b.length)[1]){
+         
+        for(let i in letters){
+            
+            //if(i%letters.length == 0)letters.sort((a,b) => Math.random() - 0.5);
+            if(i%fonts.length == 0)fonts.sort((a,b) => Math.random() - 0.5);
+            document.getElementById("style").innerHTML += `\n#${letters[i%letters.length]} {\nfont-family: ${fonts[i%fonts.length]};\n}\n`;
+        }
+        for(let i in t){
+            t[i].innerHTML = txts[i];
+            let chars = cJoin(t[i].innerHTML.split(""));
+            t[i].innerHTML = chars;
+        }
+    }
+        
+    function cJoin (arr){
+        let returnString = "";
+        for(let i in arr){
+            returnString += `<span id = ${arr[i]}>${arr[i]}</span>`;
+        }
+        return returnString;
+    }
+    document.addEventListener('click',shuffle)
+    //setInterval(shuffle,3000);
+</script>
+</html>

@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.1/jquery.min.js"></script>
+</head>
+<body>
+
+<label for="fileIn" id="fileLabel">Choose an image:</label>
+<input type="file" id="fileInput" name="fileIn" onchange="function sus(e){change(e)}">
+<div id="filters">
+    <button onclick="runB()">gaussian blur</button>
+    <button onclick="runED()">edge detect</button>
+    <button onclick="runP()">Pool pixels</button>
+    <button onclick="runTL()">Thinner edges</button>
+    <button onclick="">alter weights</button>
+    <button onclick="">alter weights</button>
+    <button onclick="runN()">create noise map</button>
+    <button onclick="runR()">reset</button>
+</div>
+<script>
+$("#filters").hide();
+let textArr = [];
+let kernels = [];
+let rendered = false;
+let currentImg;
+let startImg;
+let edgeThreshold = [100,200];
+let baseKernel = [
+        [   0,   0,   0,   0,   0,   0,   0,   0,   0],
+        [   0,   0,   0,   0,   0,   0,   0,   0,   0],
+        [   0,   0,   0,   0,   0,   0,   0,   0,   0],
+        [   0,   0,   0,   0,   0,   0,   0,   0,   0],
+        [   0,   0,   0,   0,   0,   0,   0,   0,   0],
+        [   0,   0,   0,   0,   0,   0,   0,   0,   0],
+        [   0,   0,   0,   0,   0,   0,   0,   0,   0],
+        [   0,   0,   0,   0,   0,   0,   0,   0,   0],
+        [   0,   0,   0,   0,   0,   0,   0,   0,   0]
+];
+
+
+async function init(inp){
+    try {
+    //let img = new Image();
+
+    //img.src = ;
+    img = $("#imgBase")[0];
+    /*
+    if(img.width>0||img.height>0){
+        myCanvas.resize(img.width,img.height);
+    } else {
+        //console.log(inp);
+        //return false;
+    }*/
+    let w = $("#imgBase")[0].width;
+    let h = $("#imgBase")[0].height;
+    //myCanvas.resize(img.width,img.height);
+    myCanvas.resize(w,h);
+    let ctx = myCanvas.context;
+
+    //let pixelArrPrim = ctx.getImageData(0,0,img.width,img.height).data;
+    
+    let prom = await ctx.drawImage(img,0,0);
+    //let pixelArrPrim;
+    let pixelArrPrim = ctx.getImageData(0,0,w,h).data;
+    //prom.then((Response) => function(){pixelArrPrim = ctx.getImageData(0,0,w,h).data;});
+    let pixelArr = [];
+    for(let hIter = 0; hIter < img.height; hIter++){
+         pixelArr.push([]);
+        for(let wIter = 0; wIter < img.width; wIter++){
+            pixelArr[hIter].push([
+                pixelArrPrim[wIter*4+4*img.width*hIter+0],
+                pixelArrPrim[wIter*4+4*img.width*hIter+1],
+                pixelArrPrim[wIter*4+4*img.width*hIter+2]
+            ]);
+        }
+    }    
+    let newImg = grayscale.run(pixelArr);
+    startImg = copy(newImg);
+    render(newImg,1,0);
+    currentImg = copy(newImg);
+    //document.getElementById("fileInput").style.visibility = "hidden";
+    $("Input").hide();
+    $("Label").hide();
+    $("#filters").show();
+    rendered = true;
+    return true;
+    }catch(e){
+        console.log(e);
+        return false;
+    }
+}
+
+
+//let evalString = "imgArray = darken(filter(calculate(this.wtArr,imgArray),0),9);";
+//let eString = "darken(filter(calculate(this.wtArr,imgArray),0),9);";
+let eString = "calculate(this.wtArr,imgArray);";
+
+function runB(){
+    blur.run(currentImg);
+}
+function runED(){
+    //edgeDetect.run(currentImg);
+    intensityGradient.run(currentImg);
+}
+function runP(){
+    pooler.run(currentImg);
+}
+
+function runTL(){
+    thinLines.run(currentImg);
+}
+
+function runN(){
+    for(let i = 0; i < 5; i++){
+        runED();
+    }
+    for(let i = 0; i < 25; i++){
+        runB();
+    }
+    for(let i = 0; i < 38; i++){
+        runED();
+    }
+}
+
+
+
+function runR(){
+    render((currentImg = copy(startImg)),1,0);
+}
+/*
+function rF(num){
+    switch(num){
+        case 0:
+            blur.run(currentImg);
+            break;
+        default:
+    }
+}
+*/
+
+function Kernel(dim){
+    this.dim = dim;
+    this.pWtArr = [];
+    for(let i = 0; i < dim; i++){
+        this.pWtArr.push([]);
+        for(let j = 0; j < dim; j++){
+            this.pWtArr[i].push(0);
+        }
+    }
+    this.wtArr = copy(this.pWtArr);
+    this.run = function(imgArray) {
+        eval(`imgArray = ${eString}`);
+        return imgArray;
+    }
+    this.set = function(a,b,c,d,e){
+        this.wtArr[a][b]+=e;
+        this.wtArr[c][d]-=e;
+    }
+    kernels.push(this);
+}
+
+let grayscale = {
+    //this one is on my own -> convert rgb image to grayscale -> extremely simple
+    run : function(imgArray){
+        for(let i in imgArray){
+            for(let j in imgArray[i]){
+                let r = imgArray[i][j][0];
+                let g = imgArray[i][j][1];
+                let b = imgArray[i][j][2];
+                //let a = Math.round((r+g+b)/3);
+                let a = Math.round(0.299 * r + 0.587 * g + 0.114 * b);
+                imgArray[i][j] = a;
+            }
+        }
+        return imgArray;
+    }
+}
+
+let blur = {
+   wtArr : createGaussian(5,.5),
+    run : function(imgArray){
+        render((currentImg = calculate(this.wtArr,imgArray)),1,0);
+    }
+}
+
+let intensityGradient = {
+    run : function(imgArray){
+        let gradX = calculate(gX,imgArray);
+        let gradY = calculate(gY,imgArray);
+        let totalGrad = copy(gradX);
+        let angles = copy(gradX);
+        for(let i in gradX){
+            for(let j in gradX[i]){
+                totalGrad[i][j] = Math.sqrt(Math.pow(gradX[i][j],2)+Math.pow(gradY[i][j],2));
+                let gradAngle = Math.atan2(gradY[i][j],gradX[i][j]);
+                let gA = gradAngle * 180 / Math.PI;
+                angles[i][j] = gA;
+            }
+        }
+        currentImg = copy(totalGrad);
+        currentImg = cutOff(currentImg,angles);
+        render((currentImg),1,0);
+    }
+}
+
+function cutOff(imgArray,angles){
+    let returnArr = []
+    for(let i = 1; i < angles.length - 1; i++){
+    returnArr.push([]);
+    for(let j = 1; j < angles[i].length - 1; j++){
+    let gA = angles[i][j];
+    
+    if(gA < 22.5 || gA > 157.5){
+        gA = 0;
+    } else if(gA < 67.5){
+        gA = 45;
+    } else if(gA < 112.5){
+        gA = 90;
+    } else {
+        gA = 135;
+    }
+    let maxVal = 0;
+    
+    switch(gA){
+        case 0:
+            maxVal = Math.max(imgArray[i+1][j],imgArray[i-1][j]);
+            break;
+
+
+        case 45:
+            maxVal = Math.max(imgArray[i+1][j-1],imgArray[i-1][j+1]);
+
+            break;
+
+
+        case 90: 
+            maxVal = Math.max(imgArray[i][j+1],imgArray[i][j-1]);
+
+            break;
+
+
+        case 135:
+            maxVal = Math.max(imgArray[i+1][j+1],imgArray[i-1][j-1]);
+
+            break;
+
+
+        default:
+
+            break;
+    }
+    /*
+    switch(gA){
+        case 90:
+            maxVal = Math.max(imgArray[i+1][j],imgArray[i-1][j]);
+            break;
+
+
+        case 135:
+            maxVal = Math.max(imgArray[i+1][j-1],imgArray[i-1][j+1]);
+
+            break;
+
+
+        case 0: 
+            maxVal = Math.max(imgArray[i][j+1],imgArray[i][j-1]);
+
+            break;
+
+
+        case 45:
+            maxVal = Math.max(imgArray[i+1][j+1],imgArray[i-1][j-1]);
+
+            break;
+
+
+        default:
+
+            break;
+    }
+    */
+    let thisVal = imgArray[i][j];
+    if(thisVal < maxVal){
+        thisVal = 0;
+    }
+    returnArr[i-1].push(thisVal);
+
+    }
+    }
+    return filter2(returnArr,100,200);
+}
+
+let gX = [
+    [-1,-1,-1],
+    [ 0, 0, 0],
+    [ 1, 1, 1]
+]
+
+let gY = [
+    [-1, 0, 1],
+    [-1, 0, 1],
+    [-1, 0, 1]
+]
+
+let edgeDetect = {
+    wtArr : [
+        [-1/8,-1/8,-1/8],
+        [-1/8,   1,-1/8],
+        [-1/8,-1/8,-1/8]
+    ],
+    run : function(imgArray){
+        render((currentImg = calculate(this.wtArr,imgArray)),10,0);
+    }
+}
+
+let pooler = {
+    run : function(imgArray){
+        render((currentImg = pool(imgArray)),1,0);
+    }
+}
+
+let thinLines = {
+
+    //0:u-d
+    //1:l-r
+    //2:ul-dr
+    //3:ur-dl
+
+    run : function(imgArray){
+        let returnArray = copy(imgArray);
+        for(let i = 1; i < imgArray.length - 1; i++){
+            for(let j = 1; j < imgArray[0].length - 1; j++){
+                let mxVal = 0;
+                let dir = findLine(imgArray,i,j);
+                switch(dir){
+                    case 0:
+                        mxVal = Math.max(Math.max(imgArray[i][j-1],imgArray[i][j+1]),imgArray[i][j]);
+                        break;
+
+                    case 1:
+                        mxVal = Math.max(Math.max(imgArray[i-1][j],imgArray[i+1][j]),imgArray[i][j]);
+                        break;
+
+                    case 2:
+                        mxVal = Math.max(Math.max(imgArray[i-1][j+1],imgArray[i+1][j-1]),imgArray[i][j]);
+                        break;
+
+                    case 3:
+                        mxVal = Math.max(Math.max(imgArray[i-1][j-1],imgArray[i+1][j+1]),imgArray[i][j]);  
+                        break;
+
+                    default:
+                        return imgArray;
+                }
+
+                if(imgArray[i][j] >= mxVal){
+                    returnArray[i][j] = mxVal;
+                } else {
+                    returnArray[i][j] = 0;
+                }
+            }
+        }
+        render((currentImg = returnArray),1,0);
+    }
+}
+
+let myCanvas = {
+
+    canvas : document.createElement("canvas"),
+    start : function() {
+        this.canvas.width = 500;
+        this.canvas.height = 500;
+        this.canvas.style += 'display:block;margin:auto;';
+        this.context = this.canvas.getContext('2d');
+        document.body.insertBefore(this.canvas,document.body.childNodes[0]);
+    },
+    resize : function(w,h) {
+        this.canvas.width = w;
+        this.canvas.height = h;
+    },
+    getDims : function() {
+        return [this.canvas.width,this.canvas.height];
+    }
+}
+function calculate(weights, values){
+    let wtDim = [weights.length,weights[0].length];//,weights[0][0].length];
+    let valDim = [values.length, values[0].length];//, values[0][0].length];
+    let scoreDim = [valDim[0] - wtDim[0] + 1, valDim[1] - wtDim[1] + 1];//, valDim[2] - wtDim[2] + 1];
+    let scoreArr = [];
+    let max = 0;
+    for(let i = 0; i < scoreDim[0]; i++){
+        scoreArr.push([]);
+        for(let j = 0; j < scoreDim[1]; j++){
+            //for(let k = 0; k < scoreDim[2]; k++){//shouldn't do anything since it's weighting r,g,b values with r,g,b weights
+            let sum = 0;
+            for(let l = 0; l < wtDim[0]; l++){
+                for(let m = 0; m < wtDim[1]; m++){
+                    sum += values[i+l][j+m]*weights[l][m];
+                }
+            }
+            scoreArr[i].push(sum);
+        }
+    }
+    return scoreArr;
+}
+
+function render(newData,mult,off){
+    //console.log([newData[0].length,newData.length])
+    myCanvas.resize(newData[0].length,newData.length);
+    let ctx = myCanvas.context;
+    let imgData = ctx.createImageData(newData[0].length,newData.length);
+    let dataArr = [];
+    for(let i in newData){
+        for(let j in newData[i]){
+            for(let k = 0; k < 3; k++){
+                dataArr.push(newData[i][j]*mult+off);
+            }
+            dataArr.push(255);
+        }
+    }
+    const workingData = new Uint8ClampedArray(dataArr);
+    for(let i in dataArr){
+        workingData[i] = dataArr[i];
+    }
+    imgData.data.set(workingData);
+    ctx.putImageData(imgData,0,0);
+}
+
+function darken(imgArray, num){
+    for(let i in imgArray){
+        for(let j in imgArray[i]){
+            imgArray[i][j]/=num;
+        }
+    }
+    return imgArray;
+}
+
+function contrast(imgArr,num){
+    for(let i in imgArr){
+        for(let j in imgArr[i]){
+            imgArr[i][j] = 128 + (imgArr[i][j]-128)*num;
+        }
+    }
+    return imgArr;
+}
+
+function arrSum(arr){
+    let sum = 0;
+    for(let i in arr){
+        for(let j in arr[i]){
+            sum+= arr[i][j];
+        }
+    }
+    return sum;
+}
+
+function filter(arr,fNum){
+    for(let i in arr){
+        for(let j in arr[i]){
+            if(arr[i][j]<fNum)arr[i][j] = 0;
+        }
+    }
+    return arr;
+}
+
+function filter2(arr,fNumW,fNumS){
+    let strArr = copy(arr);
+    for(let i in arr){
+        for(let j in arr[i]){
+            if(arr[i][j] <= fNumW){
+                strArr[i][j] = "b";
+                arr[i][j] = 0;
+            } else if(arr[i][j] < fNumS){
+                strArr[i][j] = "w";
+            } else {
+                strArr[i][j] = "s";
+            }
+        }
+    }
+    for(let i = 1; i < arr.length - 1; i++){
+        for(let j = 1; j < arr[i].length - 1; j++){
+            if(strArr[i][j] == "s"){
+                arr[i][j] = 255;
+                for(let ii = i - 1; ii < i + 2; ii++){
+                    for(let jj = j - 1; jj < j + 2; jj++){
+                        if(strArr[ii][jj] == "w"){
+                            arr[ii][jj] = 255;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    return filter(arr,fNumS);
+}
+
+function combine(arr){
+    let returnArr = arr[0];
+    for(let i in arr[0]){
+        for(let j in arr[0][i]){
+            let value = 0;
+            for(let k in arr){
+                value = Math.max(arr[k][i][j],value);
+            }
+            returnArr[i][j] = value;
+        }
+    }
+    return returnArr;
+}
+
+function pool(arr){
+    h = Math.floor(arr.length / 2);
+    w = Math.floor(arr[0].length / 2);
+    let rArr = [];
+    for(let i = 0; i < h; i++){
+        rArr.push([]);
+        for(let j = 0; j < w; j++){
+            let val = arr[2*i][2*j] + arr[2*i+1][2*j] + arr[2*i][2*j+1] + arr[2*i+1][2*j+1];
+            rArr[i].push(val/4);
+        }
+    }
+    return rArr;
+}
+
+myCanvas.start();
+
+function all(arr,objs){
+    let returnArr = [];
+    for(let i in objs){
+        returnArr.push(objs[i].run(arr)); 
+    }
+    return returnArr;
+}
+
+function rInt(num){
+    return Math.floor(Math.random() * num);
+}
+
+function copy(arr){
+    return arr.map((num) => [...num]);
+}
+
+function findLine(iA,i,j){
+    //premise of this is that lines are solid: you can pass a line through a parallel line and there should be no gradient change, this finds the most likely parallel angle and returns it
+    //0:u-d
+    //1:l-r
+    //2:ul-dr
+    //3:ur-dl
+    let evalArr = [findGrad(iA[i-1][j],iA[i][j],iA[i+1][j]),findGrad(iA[i][j-1],iA[i][j],iA[i][j+1]),findGrad(iA[i-1][j-1],iA[i][j],iA[i+1][j+1]),findGrad(iA[i-1][j+1],iA[i][j],iA[i+1][j-1])];
+    let minGrad = evalArr[0];
+    for(let ii in evalArr){
+        minGrad = Math.min(minGrad,evalArr[ii]);
+    }
+    return evalArr.indexOf(minGrad);
+
+
+}
+
+function findGrad(vals){
+    let grad = 0;
+    for(let i = 0; i < vals.length - 1; i++){
+        grad += Math.pow(vals[i + 1] - vals[i], 2);
+    }
+    return grad;
+}
+
+function robertsCross(imgArr,i,j){
+    let compArr = imgArr;
+    for(let ii = i - 1; ii < i + 2; ii++){
+        for(let jj = j - 1; jj < j + 2; jj++){
+            compArr[ii][jj] = Math.sqrt(compArr[ii][jj]);
+        }
+    }
+    return Math.sqrt(Math.pow(compArr[i][j] - compArr[i+1][j+1],2) + Math.pow(compArr[i+1][j] - compArr[i][j+1],2))
+}
+function createGaussian(size,sd){
+    let k = (size - 1) / 2;
+    let kernel = [];
+    let sum = 0;
+    for(let i = 1; i <= size; i++){
+        kernel.push([]);
+        for(let j = 1; j <= size; j++){
+            let val = (1 / (2 * Math.PI * sd * sd)) * Math.exp(-1 * (Math.pow(i - (k + 1),2) + Math.pow(j - (k + 1),2)) / (2 * sd * sd));
+            sum += val;
+            kernel[i-1].push(val);
+        }
+    }
+
+
+
+    for(let i in kernel){
+        for(let j in kernel[i]){
+            kernel[i][j]/=sum;
+        }
+    }
+
+    return kernel;
+}
+
+function dericheFilter(imgArray,alpha,low,high){
+
+}
+
+
+
+async function SavePhoto(inp) 
+{
+    let user = { name:'john', age:34 };
+    let formData = new FormData();
+    let photo = inp.files[0];      
+         
+    formData.append("photo", photo);
+    formData.append("user", JSON.stringify(user)); 
+    
+    const ctrl = new AbortController()    // timeout
+    setTimeout(() => ctrl.abort(), 5000);
+    
+    try {
+       let r = await fetch('/upload/image', 
+         {method: "POST", body: formData, signal: ctrl.signal}); 
+       console.log('HTTP response code:',r.status); 
+    } catch(e) {
+       console.log('Houston we have problem...:', e);
+    }
+    console.log(photo);
+    //init(photo.)
+}
+/*
+function change(e) {
+    for (var i = 0; i < e.originalEvent.srcElement.files.length; i++) {
+        var file = e.originalEvent.srcElement.files[i];
+        var reader = new FileReader();
+        reader.onloadend = function() {
+            init(reader.result);
+        }
+        reader.readAsDataURL(file);
+        console.log(reader.result);
+    }
+}
+*/
+$("input").change(async function(e) {
+
+for (var i = 0; i < e.originalEvent.srcElement.files.length; i++) {
+    
+    var file = e.originalEvent.srcElement.files[i];
+    
+    var reader = new FileReader();
+    let src;
+    let img = document.createElement("img");
+    img.id = "imgBase";
+
+    reader.onloadend = async function(){
+        src = reader.result;
+        img.src = src;
+        let itWorked = false;
+
+        for(let i = 0; !itWorked && i < 10; i++){
+            try {
+                itWorked = await init(src);
+                //console.log(itWorked);
+            } catch (e){
+                console.error(e);
+            }
+        }
+    }
+    reader.readAsDataURL(file);
+    //console.log(src + "e");
+    //init(src);
+    $("Input").after(img);
+    $("#imgBase").hide();
+    //$(img).hide();
+}
+
+function softMax(nums){
+    let sum = 0;
+    for(let i in nums){
+        if(nums[i] < 0){
+            nums[i] = 0;
+        }
+        sum += nums[i];
+    }
+    for(let i in nums){
+        nums[i] /= sum;
+    }
+    return nums;
+}
+});
+
+function findHighest(nums){
+    let hIndex = 0;
+    let max = nums[0];
+    for(let i in nums){
+        if(nums[i] > max){
+            hIndex = i;
+            max = nums[i];
+        }
+    }
+    return hIndex;
+}
+//document.addEventListener('click',function(){gss();gss();});
+//document.addEventListener('click',function(){l2.update(0)});
+//document.addEventListener('keydown',function(e){if(e.keyCode=="81"){l2.update(0);}if(e.keyCode=="87"){l2.wipe(0)}if(e.keyCode=="69"){numb=(numb+1)%trials}if(e.keyCode=="82"){l2.back(0)}if(e.keyCode=="83"){l2.save(0)}});
+</script>
+</body>
+</html>
